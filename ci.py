@@ -102,7 +102,7 @@ FULL = (
     "medium-ethernet,medium-ip,medium-ieee802154,ipv4,ipv6,raw-ethernet,raw-ip,udp,tcp,tcp-listener,"
     "std,log,async,icmp-errors,icmp-ping-reply,iface-bind,multicast,slaac,dhcpv4,dhcpv4-options,dhcpv4-server,"
     "dns,mdns,packetmeta-timestamp,tcp-timestamps,tcp-sack,ipv4-fragmentation,ipv4-reassembly,"
-    "sixlowpan-fragmentation,sixlowpan-reassembly"
+    "sixlowpan-fragmentation,sixlowpan-reassembly,serde"
 )
 
 
@@ -193,6 +193,9 @@ def collect():
     cmds.raw(["test", "-p", "xarxa-driver"])
 
     cmds.raw(["test"])
+    # Test serde (de)serialize specifically with just ipv4 or just ipv6
+    for proto in PROTOS:
+        cmds.test(join(proto, MEDIA[0], "serde"))
     # Once more without `alloc`: the bounded containers and their full-table
     # paths. Unit tests only: the examples and doc tests are written against the
     # owned `Box`/`Vec` storage that only exists with `alloc`.
