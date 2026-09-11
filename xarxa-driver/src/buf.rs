@@ -30,12 +30,30 @@ const PACKET_BUF_COUNT: usize = if crate::config::PACKET_BUF_COUNT > 1024 {
 const BITMAP_WORDS: usize = PACKET_BUF_COUNT.div_ceil(32);
 
 cfg_select! {
-    feature = "packet-buf-align-32" => { #[repr(C, align(32))] struct Data([u8; PACKET_BUF_SIZE]); }
-    feature = "packet-buf-align-16" => { #[repr(C, align(16))] struct Data([u8; PACKET_BUF_SIZE]); }
-    feature = "packet-buf-align-8" => { #[repr(C, align(8))] struct Data([u8; PACKET_BUF_SIZE]); }
-    feature = "packet-buf-align-4" => { #[repr(C, align(4))] struct Data([u8; PACKET_BUF_SIZE]); }
-    feature = "packet-buf-align-2" => { #[repr(C, align(2))] struct Data([u8; PACKET_BUF_SIZE]); }
-    _ => { #[repr(C, align(1))] struct Data([u8; PACKET_BUF_SIZE]); }
+    feature = "packet-buf-align-32" => {
+        #[repr(C, align(32))]
+        struct Data([u8; PACKET_BUF_SIZE]);
+    }
+    feature = "packet-buf-align-16" => {
+        #[repr(C, align(16))]
+        struct Data([u8; PACKET_BUF_SIZE]);
+    }
+    feature = "packet-buf-align-8" => {
+        #[repr(C, align(8))]
+        struct Data([u8; PACKET_BUF_SIZE]);
+    }
+    feature = "packet-buf-align-4" => {
+        #[repr(C, align(4))]
+        struct Data([u8; PACKET_BUF_SIZE]);
+    }
+    feature = "packet-buf-align-2" => {
+        #[repr(C, align(2))]
+        struct Data([u8; PACKET_BUF_SIZE]);
+    }
+    _ => {
+        #[repr(C, align(1))]
+        struct Data([u8; PACKET_BUF_SIZE]);
+    }
 }
 
 impl Deref for Data {
