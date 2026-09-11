@@ -257,7 +257,7 @@ impl Serialize for Ipv6Cidr {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            const MAX_LEN: usize = 19;
+            const MAX_LEN: usize = 43;
             debug_assert_eq!("1001:1002:1003:1004:1005:1006:1007:1008/250".len(), MAX_LEN);
             serialize_display_heapless::<_, _, MAX_LEN>(self, serializer)
         } else {
@@ -334,7 +334,7 @@ impl Serialize for IpEndpoint {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            const MAX_LEN: usize = 23;
+            const MAX_LEN: usize = 47;
             debug_assert_eq!("[1001:1002:1003:1004:1005:1006:1007:1008]:65000".len(), MAX_LEN);
             serialize_display_heapless::<_, _, MAX_LEN>(self, serializer)
         } else {
@@ -345,5 +345,147 @@ impl Serialize for IpEndpoint {
                 IpAddr::Ipv6(a) => serializer.serialize_newtype_variant("SocketAddr", 1, "V6", &(a, self.port)),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::fmt::Debug;
+    use core::net::{Ipv4Addr, Ipv6Addr};
+    use paste::paste;
+
+    // Helper function to work around type inference
+    #[track_caller]
+    fn deser_using<T, U, F, E>(_: T, input: U, f: F) -> T
+    where
+        F: FnOnce(U) -> Result<T, E>,
+        E: Debug,
+    {
+        f(input).unwrap()
+    }
+
+    macro_rules! serde_test {
+        (name: $name:ident, value: $value:expr, json: $json:expr, cbor: $cbor:expr) => {
+            paste! {
+                #[test]
+                fn [<test_ $name _deserialize_json>]() {
+                    assert_eq!($value, deser_using($value, $json, serde_json::from_str));
+                }
+
+                #[test]
+                fn [<test_ $name _serialize_json>]() {
+                    assert_eq!($json, serde_json::to_string(&$value).unwrap());
+                }
+
+                #[test]
+                fn [<test_ $name _deserialize_cbor>]() {
+                    assert_eq!($value, deser_using($value, $cbor, cbor4ii::serde::from_slice));
+                }
+
+                #[test]
+                fn [<test_ $name _serialize_cbor>]() {
+                    assert_eq!($cbor, cbor4ii::serde::to_vec(Vec::new(), &$value).unwrap());
+                }
+            }
+        };
+    }
+
+    // The following tests test both JSON (a human-readable format) and CBOR (a binary format)
+    // against xarxa types and, if applicable, the equivalent type from std. This way we
+    // know that the serde format of xarxa and std types is identical.
+
+    const IPV4_JSON: &str = "\"127.0.0.1\"";
+    const IPV4_CBOR: &[u8] = &[0xA1, 0x62, b'V', b'4', 0x84, 0x18, 127, 0, 0, 1];
+    #[cfg(feature = "ipv4")]
+    serde_test! {
+        name: xarxa_ipv4_addr,
+        value: IpAddr::Ipv4(Ipv4Addr::LOCALHOST),
+        json: IPV4_JSON,
+        cbor: IPV4_CBOR
+    }
+    serde_test! {
+        name: std_ipv4_addr,
+        value: std::net::IpAddr::V4(Ipv4Addr::LOCALHOST),
+        json: IPV4_JSON,
+        cbor: IPV4_CBOR
+    }
+
+    const IPV6_JSON: &str = "\"::1\"";
+    const IPV6_CBOR: &[u8] = &[
+        0xA1, 0x62, b'V', b'6', 0x90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    ];
+    #[cfg(feature = "ipv6")]
+    serde_test! {
+        name: xarxa_ipv6_addr,
+        value: IpAddr::Ipv6(Ipv6Addr::LOCALHOST),
+        json: IPV6_JSON,
+        cbor: IPV6_CBOR
+    }
+    serde_test! {
+        name: std_ipv6_addr,
+        value: std::net::IpAddr::V6(Ipv6Addr::LOCALHOST),
+        json: IPV6_JSON,
+        cbor: IPV6_CBOR
+    }
+
+    #[cfg(feature = "ipv4")]
+    const IPV4_CIDR_JSON: &str = "\"127.0.0.1/8\"";
+    #[cfg(feature = "ipv4")]
+    const IPV4_CIDR_CBOR: &[u8] = &[0xA1, 0x62, b'V', b'4', 0x82, 0x84, 0x18, 127, 0, 0, 1, 8];
+    #[cfg(feature = "ipv4")]
+    serde_test! {
+        name: xarxa_ipv4_cidr,
+        value: IpCidr::Ipv4(Ipv4Cidr::new(Ipv4Addr::LOCALHOST, 8)),
+        json: IPV4_CIDR_JSON,
+        cbor: IPV4_CIDR_CBOR
+    }
+
+    #[cfg(feature = "ipv6")]
+    const IPV6_CIDR_JSON: &str = "\"::1/128\"";
+    #[cfg(feature = "ipv6")]
+    const IPV6_CIDR_CBOR: &[u8] = &[
+        0xA1, 0x62, b'V', b'6', 0x82, 0x90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0x18, 128,
+    ];
+    #[cfg(feature = "ipv6")]
+    serde_test! {
+        name: xarxa_ipv6_cidr,
+        value: IpCidr::Ipv6(Ipv6Cidr::new(Ipv6Addr::LOCALHOST, 128)),
+        json: IPV6_CIDR_JSON,
+        cbor: IPV6_CIDR_CBOR
+    }
+
+    const IPV4_ENDPOINT_JSON: &str = "\"127.0.0.1:80\"";
+    const IPV4_ENDPOINT_CBOR: &[u8] = &[0xA1, 0x62, b'V', b'4', 0x82, 0x84, 0x18, 127, 0, 0, 1, 0x18, 80];
+    #[cfg(feature = "ipv4")]
+    serde_test! {
+        name: xarxa_ipv4_endpoint,
+        value: IpEndpoint::new(IpAddr::Ipv4(Ipv4Addr::LOCALHOST), 80),
+        json: IPV4_ENDPOINT_JSON,
+        cbor: IPV4_ENDPOINT_CBOR
+    }
+    serde_test! {
+        name: std_ipv4_endpoint,
+        value: std::net::SocketAddr::V4(std::net::SocketAddrV4::new(Ipv4Addr::LOCALHOST, 80)),
+        json: IPV4_ENDPOINT_JSON,
+        cbor: IPV4_ENDPOINT_CBOR
+    }
+
+    const IPV6_ENDPOINT_JSON: &str = "\"[::1]:80\"";
+    const IPV6_ENDPOINT_CBOR: &[u8] = &[
+        0xA1, 0x62, b'V', b'6', 0x82, 0x90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0x18, 80,
+    ];
+    #[cfg(feature = "ipv6")]
+    serde_test! {
+        name: xarxa_ipv6_endpoint,
+        value: IpEndpoint::new(IpAddr::Ipv6(Ipv6Addr::LOCALHOST), 80),
+        json: IPV6_ENDPOINT_JSON,
+        cbor: IPV6_ENDPOINT_CBOR
+    }
+    serde_test! {
+        name: std_ipv6_endpoint,
+        value: std::net::SocketAddr::V6(std::net::SocketAddrV6::new(Ipv6Addr::LOCALHOST, 80, 0, 0)),
+        json: IPV6_ENDPOINT_JSON,
+        cbor: IPV6_ENDPOINT_CBOR
     }
 }

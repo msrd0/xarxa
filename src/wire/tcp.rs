@@ -738,7 +738,7 @@ mod test {
         ($opt:expr, $data:expr) => {{
             assert_eq!(TcpOption::parse($data), Ok((&[][..], $opt)));
             let buffer = &mut [0; 40][..$opt.buffer_len()];
-            assert_eq!($opt.emit(buffer), &mut []);
+            assert_eq!($opt.emit(buffer), &mut [] as &mut [u8]);
             assert_eq!(&*buffer, $data);
         }};
     }
