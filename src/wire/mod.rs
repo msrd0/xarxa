@@ -82,8 +82,6 @@ mod tcp;
 mod udp;
 
 use core::fmt;
-use core::net::AddrParseError;
-use core::num::ParseIntError;
 
 use crate::iface::Medium;
 
@@ -239,51 +237,15 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 /// Parsing a string failed.
 ///
 /// This error is usually returned from [`FromStr`](core::str::FromStr) implementations.
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, Clone)]
-pub enum ParseError {
-    /// Parsing an IP address failed.
-    Addr(AddrParseError),
-    /// Parsing a port number failed.
-    Port(ParseIntError),
-    /// Parsing a cidr prefix len failed.
-    PrefixLen(ParseIntError),
-    /// The prefix len was too large.
-    PrefixLenTooLarge,
-    /// Parsing failed because the separator was not found in the input.
-    MissingSeparator(char),
-}
+pub struct ParseError;
 
-impl core::error::Error for ParseError {
-    fn cause(&self) -> Option<&dyn core::error::Error> {
-        match self {
-            Self::Addr(err) => Some(err),
-            Self::Port(err) | Self::PrefixLen(err) => Some(err),
-            Self::PrefixLenTooLarge | Self::MissingSeparator(_) => None,
-        }
-    }
-}
+impl core::error::Error for ParseError {}
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Addr(err) => write!(f, "Unable to parse IP address: {err}"),
-            Self::Port(err) => write!(f, "Unable to parse port number: {err}"),
-            Self::PrefixLen(err) => write!(f, "Unable to parse prefix len: {err}"),
-            Self::PrefixLenTooLarge => write!(f, "Unable to parse prefix len: too large"),
-            Self::MissingSeparator(sep) => write!(f, "Unable to parse due to missing separator '{sep}' in input"),
-        }
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for ParseError {
-    fn format(&self, f: defmt::Formatter<'_>) {
-        match self {
-            Self::Addr(_) => defmt::write!(f, "wire::ParseError::Addr(_)"),
-            Self::Port(_) => defmt::write!(f, "wire::ParseError::Port(_)"),
-            Self::PrefixLen(_) => defmt::write!(f, "wire::ParseError::PrefixLen(_)"),
-            Self::MissingSeparator(sep) => defmt::write!(f, "wire::ParseError::MissingSeparator({})", sep),
-        }
+        write!(f, "ParseError")
     }
 }
 

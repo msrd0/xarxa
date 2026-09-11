@@ -361,10 +361,10 @@ impl FromStr for Cidr {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let Some(idx) = s.find('/') else {
-            return Err(ParseError::MissingSeparator('/'));
+            return Err(ParseError);
         };
-        let addr = s[..idx].parse().map_err(ParseError::Addr)?;
-        let prefix_len = s[idx + 1..].parse().map_err(ParseError::PrefixLen)?;
+        let addr = s[..idx].parse().map_err(|_| ParseError)?;
+        let prefix_len = s[idx + 1..].parse().map_err(|_| ParseError)?;
         Ok(match addr {
             #[cfg(feature = "ipv4")]
             Address::Ipv4(addr) => Self::Ipv4(Ipv4Cidr::new(addr, prefix_len)),
@@ -462,28 +462,28 @@ impl FromStr for Endpoint {
         #[cfg(feature = "ipv6")]
         if s.starts_with('[') {
             let Some(idx) = s.find(']') else {
-                return Err(ParseError::MissingSeparator(']'));
+                return Err(ParseError);
             };
-            let addr = Address::Ipv6(s[1..idx].parse().map_err(ParseError::Addr)?);
+            let addr = Address::Ipv6(s[1..idx].parse().map_err(|_| ParseError)?);
             if s.get(idx + 1..).is_none_or(|substr| !substr.starts_with(":")) {
-                return Err(ParseError::MissingSeparator(':'));
+                return Err(ParseError);
             }
-            let port = s[idx + 2..].parse().map_err(ParseError::Port)?;
+            let port = s[idx + 2..].parse().map_err(|_| ParseError)?;
             return Ok(Self { addr, port });
         }
 
         #[cfg(feature = "ipv4")]
         {
             let Some(idx) = s.find(':') else {
-                return Err(ParseError::MissingSeparator(':'));
+                return Err(ParseError);
             };
-            let addr = Address::Ipv4(s[..idx].parse().map_err(ParseError::Addr)?);
-            let port = s[idx + 1..].parse().map_err(ParseError::Port)?;
+            let addr = Address::Ipv4(s[..idx].parse().map_err(|_| ParseError)?);
+            let port = s[idx + 1..].parse().map_err(|_| ParseError)?;
             Ok(Self { addr, port })
         }
 
         #[cfg(not(feature = "ipv4"))]
-        Err(ParseError::MissingSeparator('['))
+        Err(ParseError)
     }
 }
 

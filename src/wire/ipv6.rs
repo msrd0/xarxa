@@ -304,11 +304,11 @@ impl FromStr for Cidr {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let Some(idx) = s.find('/') else {
-            return Err(ParseError::MissingSeparator('/'));
+            return Err(ParseError);
         };
-        let addr = s[..idx].parse().map_err(ParseError::Addr)?;
-        let prefix_len = s[idx + 1..].parse().map_err(ParseError::PrefixLen)?;
-        Cidr::try_new(addr, prefix_len).ok_or(ParseError::PrefixLenTooLarge)
+        let addr = s[..idx].parse().map_err(|_| ParseError)?;
+        let prefix_len = s[idx + 1..].parse().map_err(|_| ParseError)?;
+        Cidr::try_new(addr, prefix_len).ok_or(ParseError)
     }
 }
 
