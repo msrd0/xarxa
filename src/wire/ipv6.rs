@@ -2,8 +2,9 @@
 
 use byteorder::{ByteOrder, NetworkEndian};
 use core::fmt;
+use core::str::FromStr;
 
-use super::{Error, Result};
+use super::{Error, ParseError, Result};
 
 pub use super::IpProtocol as Protocol;
 
@@ -246,11 +247,21 @@ impl Cidr {
 
     /// Create an IPv6 CIDR block from the given address and prefix length.
     ///
+    /// Return `None` if the prefix length is larger than 128.
+    pub const fn try_new(address: Address, prefix_len: u8) -> Option<Self> {
+        if prefix_len <= 128 {
+            Some(Self { address, prefix_len })
+        } else {
+            None
+        }
+    }
+
+    /// Create an IPv6 CIDR block from the given address and prefix length.
+    ///
     /// # Panics
     /// This function panics if the prefix length is larger than 128.
-    pub const fn new(address: Address, prefix_len: u8) -> Cidr {
-        core::assert!(prefix_len <= 128);
-        Cidr { address, prefix_len }
+    pub const fn new(address: Address, prefix_len: u8) -> Self {
+        Self::try_new(address, prefix_len).unwrap()
     }
 
     /// Return the address of this IPv6 CIDR block.
@@ -285,6 +296,19 @@ impl fmt::Display for Cidr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // https://tools.ietf.org/html/rfc4291#section-2.3
         write!(f, "{}/{}", self.address, self.prefix_len)
+    }
+}
+
+impl FromStr for Cidr {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some(idx) = s.find('/') else {
+            return Err(ParseError::MissingSeparator('/'));
+        };
+        let addr = s[..idx].parse().map_err(ParseError::Addr)?;
+        let prefix_len = s[idx + 1..].parse().map_err(ParseError::PrefixLen)?;
+        Cidr::try_new(addr, prefix_len).ok_or(ParseError::PrefixLenTooLarge)
     }
 }
 
