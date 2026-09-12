@@ -13,7 +13,7 @@ use core::{
     str::FromStr,
 };
 
-use serde::de::{self, Deserialize, Deserializer, Unexpected, VariantAccess as _, Visitor};
+use serde::de::{self, Deserialize, Deserializer, Error as _, Unexpected, VariantAccess as _, Visitor};
 use serde::ser::{Serialize, Serializer};
 
 #[cfg(feature = "ipv4")]
@@ -215,7 +215,9 @@ impl<'de> Deserialize<'de> for Ipv4Cidr {
         if deserializer.is_human_readable() {
             deserializer.deserialize_str(FromStrVisitor::new("IPv4 CIDR"))
         } else {
-            <(_, u8)>::deserialize(deserializer).map(|(ip, prefix)| Self::new(ip, prefix))
+            <(_, u8)>::deserialize(deserializer).and_then(|(ip, prefix)| {
+                Self::try_new(ip, prefix).ok_or_else(|| D::Error::custom("Invalid prefix len"))
+            })
         }
     }
 }
@@ -245,7 +247,9 @@ impl<'de> Deserialize<'de> for Ipv6Cidr {
         if deserializer.is_human_readable() {
             deserializer.deserialize_str(FromStrVisitor::new("IPv6 CIDR"))
         } else {
-            <(_, u8)>::deserialize(deserializer).map(|(ip, prefix)| Self::new(ip, prefix))
+            <(_, u8)>::deserialize(deserializer).and_then(|(ip, prefix)| {
+                Self::try_new(ip, prefix).ok_or_else(|| D::Error::custom("Invalid prefix len"))
+            })
         }
     }
 }
@@ -391,9 +395,27 @@ mod tests {
         };
     }
 
+    macro_rules! serde_test_fail {
+        (name: $name:ident, ty: $ty:ty, json: $json:expr, cbor: $cbor:expr) => {
+            paste! {
+                #[test]
+                fn [<test_ $name _deserialize_json>]() {
+                    assert!(serde_json::from_str::<$ty>($json).is_err());
+                }
+
+                #[test]
+                fn [<test_ $name _deserialize_cbor>]() {
+                    assert!(cbor4ii::serde::from_slice::<$ty>($cbor).is_err());
+                }
+            }
+        };
+    }
+
     // The following tests test both JSON (a human-readable format) and CBOR (a binary format)
     // against xarxa types and, if applicable, the equivalent type from std. This way we
     // know that the serde format of xarxa and std types is identical.
+
+    // ### IpAddress ###
 
     const IPV4_JSON: &str = "\"127.0.0.1\"";
     const IPV4_CBOR: &[u8] = &[0xA1, 0x62, b'V', b'4', 0x84, 0x18, 127, 0, 0, 1];
@@ -429,6 +451,8 @@ mod tests {
         cbor: IPV6_CBOR
     }
 
+    // ### IpCidr ###
+
     #[cfg(feature = "ipv4")]
     const IPV4_CIDR_JSON: &str = "\"127.0.0.1/8\"";
     #[cfg(feature = "ipv4")]
@@ -454,6 +478,34 @@ mod tests {
         json: IPV6_CIDR_JSON,
         cbor: IPV6_CIDR_CBOR
     }
+
+    #[cfg(feature = "ipv4")]
+    const IPV4_INVALID_CIDR_JSON: &str = "\"127.0.0.1/255\"";
+    #[cfg(feature = "ipv4")]
+    const IPV4_INVALID_CIDR_CBOR: &[u8] = &[0xA1, 0x62, b'V', b'4', 0x82, 0x84, 0x18, 127, 0, 0, 1, 0x18, 255];
+    #[cfg(feature = "ipv4")]
+    serde_test_fail! {
+        name: xarxa_ipv4_invalid_cidr,
+        ty: IpCidr,
+        json: IPV4_INVALID_CIDR_JSON,
+        cbor: IPV4_INVALID_CIDR_CBOR
+    }
+
+    #[cfg(feature = "ipv6")]
+    const IPV6_INVALID_CIDR_JSON: &str = "\"::1/255\"";
+    #[cfg(feature = "ipv6")]
+    const IPV6_INVALID_CIDR_CBOR: &[u8] = &[
+        0xA1, 0x62, b'V', b'6', 0x82, 0x90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0x18, 255,
+    ];
+    #[cfg(feature = "ipv6")]
+    serde_test_fail! {
+        name: xarxa_ipv6_invalid_cidr,
+        ty: IpCidr,
+        json: IPV6_INVALID_CIDR_JSON,
+        cbor: IPV6_INVALID_CIDR_CBOR
+    }
+
+    // ### IpEndpoint ###
 
     const IPV4_ENDPOINT_JSON: &str = "\"127.0.0.1:80\"";
     const IPV4_ENDPOINT_CBOR: &[u8] = &[0xA1, 0x62, b'V', b'4', 0x82, 0x84, 0x18, 127, 0, 0, 1, 0x18, 80];

@@ -365,12 +365,12 @@ impl FromStr for Cidr {
         };
         let addr = s[..idx].parse().map_err(|_| ParseError)?;
         let prefix_len = s[idx + 1..].parse().map_err(|_| ParseError)?;
-        Ok(match addr {
+        match addr {
             #[cfg(feature = "ipv4")]
-            Address::Ipv4(addr) => Self::Ipv4(Ipv4Cidr::new(addr, prefix_len)),
+            Address::Ipv4(addr) => Ipv4Cidr::try_new(addr, prefix_len).ok_or(ParseError).map(Self::Ipv4),
             #[cfg(feature = "ipv6")]
-            Address::Ipv6(addr) => Self::Ipv6(Ipv6Cidr::new(addr, prefix_len)),
-        })
+            Address::Ipv6(addr) => Ipv6Cidr::try_new(addr, prefix_len).ok_or(ParseError).map(Self::Ipv6),
+        }
     }
 }
 
